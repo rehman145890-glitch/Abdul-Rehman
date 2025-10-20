@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Keystone is the all-in-one management platform that locks your business operations together, offering a central hub and AI-powered tools for content creation, accounting, HR, and marketing." />
+  <title>Keystone</title>
+  <link rel="manifest" href="/manifest.json" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script>
+    // Avoids FOUC by applying theme before page load
+    if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f9fafb; /* gray-50 */
+    }
+    .dark body {
+      background-color: #030712; /* gray-950 */
+      background-image: radial-gradient(circle at top left, rgba(139, 92, 246, 0.1), transparent 30%), radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.1), transparent 40%);
+    }
+    h1, h2, h3, h4, h5, h6, .font-display {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.5s ease-in-out;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #e5e7eb; /* gray-200 */ }
+    ::-webkit-scrollbar-thumb { background: #9ca3af; /* gray-400 */ border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #6b7280; /* gray-500 */ }
+
+    .dark ::-webkit-scrollbar-track { background: #1f2937; /* gray-800 */ }
+    .dark ::-webkit-scrollbar-thumb { background: #4b5563; /* gray-600 */ }
+    .dark ::-webkit-scrollbar-thumb:hover { background: #6b7280; /* gray-500 */ }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.autotable.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.25.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "chart.js/": "https://aistudiocdn.com/chart.js@^4.5.1/"
+  }
+}
+</script>
+</head>
+<body class="bg-gray-50 text-gray-700 dark:bg-gray-950 dark:text-gray-300">
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
