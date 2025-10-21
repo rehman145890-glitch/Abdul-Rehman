@@ -1,12 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
 
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-  console.warn("API_KEY environment variable is not set. The application will not work without it.");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY! });
+const getAi = () => {
+    const API_KEY = process.env.API_KEY;
+    if (!API_KEY) {
+        throw new Error("API_KEY environment variable is not set. Please select an API key.");
+    }
+    return new GoogleGenAI({ apiKey: API_KEY });
+};
 
 export interface ThumbnailOptions {
   title: string;
@@ -17,6 +17,7 @@ export interface ThumbnailOptions {
 
 const callGenerateImages = async (prompt: string, aspectRatio: '16:9' | '1:1', numberOfImages: number = 1): Promise<string[]> => {
    try {
+    const ai = getAi();
     const response = await ai.models.generateImages({
       model: 'imagen-4.0-generate-001',
       prompt: prompt,
@@ -35,6 +36,10 @@ const callGenerateImages = async (prompt: string, aspectRatio: '16:9' | '1:1', n
   } catch (error) {
     console.error("Error generating image:", error);
     if (error instanceof Error) {
+        if (error.message.includes('Requested entity was not found')) {
+            window.dispatchEvent(new Event('apiKeyError'));
+            throw new Error('Your API key is invalid. Please select a new one.');
+        }
         if (error.message.includes('SAFETY')) {
              throw new Error("The prompt was blocked by safety settings. Please try a different prompt.");
         }

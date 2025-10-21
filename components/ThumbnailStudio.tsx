@@ -37,7 +37,6 @@ const ControlGroup: FC<{ label: string; children: React.ReactNode; }> = ({ label
     </div>
 );
 
-// FIX: Define the missing ThumbnailCanvas component.
 const ThumbnailCanvas = React.forwardRef<SVGSVGElement, { state: ManualThumbnailState }>(({ state }, ref) => {
   const {
     backgroundColor,
@@ -200,7 +199,6 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ addToast }) => {
     if (!svgNode) return;
 
     const serializer = new XMLSerializer();
-    // FIX: Removed manual style injection, as the ThumbnailCanvas component now includes it.
     const svgString = serializer.serializeToString(svgNode);
     
     const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -266,7 +264,6 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ addToast }) => {
                 </div>
               )}
           </ControlGroup>
-          {/* FIX: Reconstructed corrupted/incomplete manual editor controls */}
           <ControlGroup label="Main Title">
               <input type="text" value={manualState.titleText} onChange={e => handleStateChange('titleText', e.target.value)} className={`${formInputClasses} text-sm`} />
               <select value={manualState.titleFont} onChange={e => handleStateChange('titleFont', e.target.value)} className={`${formSelectClasses} text-sm`}>

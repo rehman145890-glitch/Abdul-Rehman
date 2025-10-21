@@ -333,6 +333,46 @@ const CompanyLogin: React.FC<{ onLoginSuccess: () => void; onBack: () => void; }
     );
 };
 
+const PageLoader: React.FC = () => (
+    <div className="min-h-screen flex items-center justify-center">
+        <svg className="animate-spin h-12 w-12 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+    </div>
+);
+
+const ApiKeySelectionScreen: React.FC<{ onKeySelected: () => void }> = ({ onKeySelected }) => {
+    const handleSelectKey = async () => {
+        await (window as any).aistudio.openSelectKey();
+        onKeySelected();
+    };
+
+    return (
+        <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="absolute top-4 right-4 z-10">
+                <ThemeToggleButton />
+            </div>
+            <div className="w-full max-w-lg text-center bg-white/80 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 sm:p-10 animate-fade-in shadow-2xl shadow-purple-500/10">
+                <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-4">API Key Required</h1>
+                <p className="text-gray-600 dark:text-gray-400 mb-8">
+                    To use the AI-powered features of Keystone, you need to select a Google AI API key. This key will be used for billing purposes for any generative AI usage.
+                </p>
+                <button
+                    onClick={handleSelectKey}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-lg shadow-purple-500/20"
+                >
+                    Select API Key
+                </button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                    By selecting a key, you agree to the billing terms associated with the Google Gemini API.
+                    For more information, visit <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-purple-600 dark:text-purple-400 hover:underline">Google AI billing documentation</a>.
+                </p>
+            </div>
+        </div>
+    );
+};
+
 
 const App: React.FC = () => {
     const getInitialState = (): AppState => {
@@ -371,12 +411,25 @@ const App: React.FC = () => {
     }
     return null;
   });
+
+  const [apiKeySelected, setApiKeySelected] = useState(false);
+  const [checkingApiKey, setCheckingApiKey] = useState(true);
   
   const changeAppState = (newState: AppState) => {
     setPrevState(appState);
     setAppState(newState);
   };
 
+  useEffect(() => {
+    const checkApiKey = async () => {
+        if (await (window as any).aistudio?.hasSelectedApiKey()) {
+            setApiKeySelected(true);
+        }
+        setCheckingApiKey(false);
+    };
+    checkApiKey();
+  }, []);
+  
   useEffect(() => {
       const handleDetailsChange = () => {
           const companyDetailsRaw = localStorage.getItem('companyDetails');
@@ -389,8 +442,18 @@ const App: React.FC = () => {
               setUserDetails(null);
           }
       };
+      
+      const handleApiKeyError = () => {
+        setApiKeySelected(false);
+        setCheckingApiKey(false);
+      };
+
       window.addEventListener('companyDetailsChanged', handleDetailsChange);
-      return () => window.removeEventListener('companyDetailsChanged', handleDetailsChange);
+      window.addEventListener('apiKeyError', handleApiKeyError);
+      return () => {
+        window.removeEventListener('companyDetailsChanged', handleDetailsChange);
+        window.removeEventListener('apiKeyError', handleApiKeyError);
+      }
   }, []);
 
   const handleAccountSelect = (type: AccountType, action: 'register' | 'login') => {
@@ -499,6 +562,12 @@ const App: React.FC = () => {
                 </div>
             );
         case 'dashboard':
+          if (checkingApiKey) {
+            return <PageLoader />;
+          }
+          if (!apiKeySelected) {
+            return <ApiKeySelectionScreen onKeySelected={() => setApiKeySelected(true)} />;
+          }
           return <Dashboard onSignOut={handleSignOut} companyDetails={companyDetails} userDetails={userDetails} />;
         case 'about':
             return <AboutPage onBack={handleStaticPageBack} />;

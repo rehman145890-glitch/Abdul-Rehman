@@ -3,6 +3,7 @@ import Toast from './Toast';
 import LaunchModal from './LaunchModal';
 import UpgradeModal from './UpgradeModal';
 import HelpDesk from './HelpDesk';
+import Logo from './Logo';
 
 // Lazy load components for code-splitting and faster initial load
 const ThumbnailStudio = lazy(() => import('./ThumbnailStudio'));
@@ -205,9 +206,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSignOut, companyDetails, userDe
                             )}
                         </div>
                     ) : (
-                         <h1 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white text-center">
-                           <span className="text-purple-600 dark:text-purple-500">Key</span>stone
-                        </h1>
+                         <Logo className="justify-center" />
                     )}
                 </div>
                 <nav className="flex flex-col space-y-2 flex-grow">

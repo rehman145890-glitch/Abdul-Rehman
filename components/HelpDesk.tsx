@@ -2,10 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Chat } from '@google/genai';
 import LoadingSpinner from './LoadingSpinner';
 
-// This would be in a separate service file in a larger app
-const API_KEY = process.env.API_KEY;
-
-const ai = new GoogleGenAI({ apiKey: API_KEY! });
 const systemInstruction = `You are a helpful and friendly customer support assistant for Keystone, an all-in-one business management application. Your goal is to answer user questions about the app's features and subscription plans.
 
 **Application Overview:**
@@ -38,11 +34,17 @@ const HelpDesk: React.FC = () => {
 
     useEffect(() => {
         if (isOpen && !chatRef.current) {
-            chatRef.current = ai.chats.create({
-                model: 'gemini-2.5-flash',
-                config: { systemInstruction },
-            });
-            setMessages([{ role: 'model', text: 'Hello! How can I help you with Keystone today?' }]);
+            const API_KEY = process.env.API_KEY;
+            if (API_KEY) {
+                const ai = new GoogleGenAI({ apiKey: API_KEY });
+                chatRef.current = ai.chats.create({
+                    model: 'gemini-2.5-flash',
+                    config: { systemInstruction },
+                });
+                setMessages([{ role: 'model', text: 'Hello! How can I help you with Keystone today?' }]);
+            } else {
+                setMessages([{ role: 'model', text: 'API Key is not configured. Help desk is unavailable.' }]);
+            }
         }
     }, [isOpen]);
     
@@ -55,16 +57,17 @@ const HelpDesk: React.FC = () => {
         if (!input.trim() || isLoading) return;
 
         const userMessage: Message = { role: 'user', text: input };
-        setMessages(prev => [...prev, userMessage]);
+        setMessages(prev => [...prev, userMessage, { role: 'model', text: '' }]);
         setInput('');
         setIsLoading(true);
 
         try {
-            const responseStream = await chatRef.current!.sendMessageStream({ message: input });
+            if (!chatRef.current) {
+                throw new Error("Chat session not initialized.");
+            }
+            const responseStream = await chatRef.current.sendMessageStream({ message: input });
 
             let modelResponse = '';
-            setMessages(prev => [...prev, { role: 'model', text: '' }]); 
-
             for await (const chunk of responseStream) {
                 modelResponse += chunk.text;
                 setMessages(prev => {
@@ -75,8 +78,17 @@ const HelpDesk: React.FC = () => {
             }
         } catch (error) {
             console.error("Error sending message to Gemini:", error);
-            const errorMessage: Message = { role: 'model', text: 'Sorry, I encountered an error. Please try again or contact support.' };
-            setMessages(prev => [...prev, errorMessage]);
+            let errorText = 'Sorry, I encountered an error. Please try again or contact support.';
+            if (error instanceof Error && error.message.includes('Requested entity was not found')) {
+                window.dispatchEvent(new Event('apiKeyError'));
+                errorText = 'Your API key is invalid. I cannot continue. Please select a valid key to use Keystone features.';
+                setTimeout(() => setIsOpen(false), 3000);
+            }
+            setMessages(prev => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1].text = errorText;
+                return newMessages;
+            });
         } finally {
             setIsLoading(false);
         }
