@@ -92,7 +92,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onEnterpriseRegiste
   const [profilePicPreview, setProfilePicPreview] = useState<string | null>(null);
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [pinError, setPinError] = useState<string | null>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+
 
   useEffect(() => {
     const type = localStorage.getItem('accountType') as AccountType | null;
@@ -124,6 +127,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onEnterpriseRegiste
     if (e.target.name === 'password' || e.target.name === 'confirmPassword') {
         setPasswordError(null);
     }
+    if (e.target.name === 'pin' || e.target.name === 'confirmPin') {
+        setPinError(null);
+    }
   };
 
   const handleLogoOptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -149,20 +155,23 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onEnterpriseRegiste
   };
 
   const validateStep = () => {
-      // This function determines if the "Next" or final submit button should be disabled
       if(accountType === 'personal') {
-          // Step 1: Name, Email, and matching passwords (at least 8 characters).
-          if (step === 1) return !formData.name?.trim() || !formData.email?.trim() || !formData.password || !formData.confirmPassword || (formData.password !== formData.confirmPassword) || formData.password.length < 8;
-          // Step 2: Billing currency and agreement to terms.
+          if (step === 1) {
+              const pinValid = /^\d{4}$/.test(formData.pin);
+              return !formData.name?.trim() || !formData.email?.trim() || !formData.password || 
+                     !formData.confirmPassword || (formData.password !== formData.confirmPassword) || formData.password.length < 8 ||
+                     !formData.pin || !formData.confirmPin || !pinValid || (formData.pin !== formData.confirmPin);
+          }
           if (step === 2) return !formData.billingCurrency || !agreedToTerms;
       }
       if(accountType === 'enterprise') {
-          // Step 1: Core company details.
           if (step === 1) return !formData.businessName?.trim() || !formData.industry?.trim() || !formData.businessType || (formData.businessType === 'Company' && !formData.companySubType) || !formData.companySize;
-          // Step 2: Contact and address information.
           if (step === 2) return !formData.email?.trim() || !formData.phoneType || !formData.phoneCode || !formData.phoneNumber?.trim() || !formData.address?.trim() || !formData.city?.trim() || !formData.country;
-          // Step 3: Currency, password, and terms agreement.
-          if (step === 3) return !formData.billingCurrency || !formData.password || !formData.confirmPassword || (formData.password !== formData.confirmPassword) || formData.password.length < 8 || !agreedToTerms;
+          if (step === 3) {
+             const pinValid = /^\d{4}$/.test(formData.pin);
+             return !formData.billingCurrency || !formData.password || !formData.confirmPassword || (formData.password !== formData.confirmPassword) || formData.password.length < 8 || !agreedToTerms ||
+                    !formData.pin || !formData.confirmPin || !pinValid || (formData.pin !== formData.confirmPin);
+          }
       }
       return false;
   };
@@ -178,24 +187,28 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onEnterpriseRegiste
         setPasswordError("Password must be at least 8 characters long.");
         return;
     }
+    if (!/^\d{4}$/.test(formData.pin)) {
+        setPinError("PIN must be exactly 4 digits.");
+        return;
+    }
+    if (formData.pin !== formData.confirmPin) {
+        setPinError("Security PINs do not match.");
+        return;
+    }
 
     const detailKey = accountType === 'personal' ? 'userDetails' : 'companyDetails';
-    const { confirmPassword, ...dataToSave } = formData;
+    const { confirmPassword, confirmPin, ...dataToSave } = formData;
     
     localStorage.setItem(detailKey, JSON.stringify(dataToSave));
     
-    if (accountType === 'personal') {
-        setUserDetails(dataToSave);
-        setView('subscription');
-    } else if (accountType === 'enterprise' && onEnterpriseRegister) {
-        onEnterpriseRegister();
-    }
+    setUserDetails(dataToSave);
+    setView('subscription');
   };
   
   const handleBackClick = () => {
-    if (view === 'subscription') {
-        onBack();
-    } else if (step > 1) {
+    if (view === 'subscription' && !cameFromLogin) {
+        setView('registration');
+    } else if (view === 'registration' && step > 1) {
         prevStep();
     } else {
         onBack();
@@ -265,7 +278,18 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onEnterpriseRegiste
                             <input id="confirmPassword" name="confirmPassword" type="password" required value={formData.confirmPassword || ''} onChange={handleChange} className={formInputClasses} placeholder="Re-enter password" />
                         </div>
                     </div>
-                    {passwordError && <p className="text-red-500 dark:text-red-400 text-sm text-center pt-2">{passwordError}</p>}
+                    {passwordError && <p className="text-red-500 dark:text-red-400 text-sm text-center pt-2 col-span-2">{passwordError}</p>}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="pin" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">4-Digit Security PIN</label>
+                            <input id="pin" name="pin" type="password" required value={formData.pin || ''} onChange={handleChange} maxLength={4} pattern="\d{4}" className={`${formInputClasses} text-center tracking-[0.5em]`} placeholder="••••" />
+                        </div>
+                        <div>
+                            <label htmlFor="confirmPin" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Confirm PIN</label>
+                            <input id="confirmPin" name="confirmPin" type="password" required value={formData.confirmPin || ''} onChange={handleChange} maxLength={4} pattern="\d{4}" className={`${formInputClasses} text-center tracking-[0.5em]`} placeholder="••••" />
+                        </div>
+                    </div>
+                    {pinError && <p className="text-red-500 dark:text-red-400 text-sm text-center pt-2 col-span-2">{pinError}</p>}
                 </>
              )}
              {step === 2 && (
@@ -435,7 +459,18 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onEnterpriseRegiste
                             <input id="confirmPassword" name="confirmPassword" type="password" required value={formData.confirmPassword || ''} onChange={handleChange} className={formInputClasses} placeholder="Re-enter password" />
                         </div>
                     </div>
-                    {passwordError && <p className="text-red-500 dark:text-red-400 text-sm text-center pt-2">{passwordError}</p>}
+                    {passwordError && <p className="text-red-500 dark:text-red-400 text-sm text-center pt-2 col-span-2">{passwordError}</p>}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="pin" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">4-Digit Security PIN</label>
+                            <input id="pin" name="pin" type="password" required value={formData.pin || ''} onChange={handleChange} maxLength={4} pattern="\d{4}" className={`${formInputClasses} text-center tracking-[0.5em]`} placeholder="••••" />
+                        </div>
+                        <div>
+                            <label htmlFor="confirmPin" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Confirm PIN</label>
+                            <input id="confirmPin" name="confirmPin" type="password" required value={formData.confirmPin || ''} onChange={handleChange} maxLength={4} pattern="\d{4}" className={`${formInputClasses} text-center tracking-[0.5em]`} placeholder="••••" />
+                        </div>
+                    </div>
+                    {pinError && <p className="text-red-500 dark:text-red-400 text-sm text-center pt-2 col-span-2">{pinError}</p>}
                     <div className="pt-4 space-y-3">
                         <label className="flex items-start text-sm text-gray-600 dark:text-gray-400">
                             <input type="checkbox" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)} className="h-4 w-4 bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500 rounded mr-3 mt-0.5 flex-shrink-0" />
@@ -467,43 +502,54 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onEnterpriseRegiste
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
         </button>
       {userDetails && (
-        <div className="mb-8 border-b border-gray-200 dark:border-gray-800 pb-6">
+        <div className="mb-6">
           <p className="text-gray-600 dark:text-gray-400">Subscription for:</p>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{userDetails.name || (userDetails as any).businessName}</h2>
           <p className="text-sm text-gray-500">{userDetails.email}</p>
         </div>
       )}
       <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-4">Unlock Your <span className="text-purple-600 dark:text-purple-500">Full Potential</span></h1>
-      <p className="max-w-3xl mx-auto text-lg text-gray-600 dark:text-gray-400 mb-12">All plans are free for the first month. Choose the plan that best fits your needs.</p>
+      <p className="max-w-3xl mx-auto text-lg text-gray-600 dark:text-gray-400 mb-8">All plans are free for the first month. Choose the plan that best fits your needs.</p>
+      
+      <div className="flex justify-center mb-10">
+        <div className="relative flex p-1 bg-gray-200 dark:bg-gray-800 rounded-full">
+            <button onClick={() => setBillingCycle('monthly')} className={`relative w-28 py-2 text-sm font-semibold transition-colors rounded-full z-10 ${billingCycle === 'monthly' ? 'text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'}`}>Monthly</button>
+            <button onClick={() => setBillingCycle('yearly')} className={`relative w-28 py-2 text-sm font-semibold transition-colors rounded-full z-10 ${billingCycle === 'yearly' ? 'text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'}`}>Yearly <span className="text-xs text-green-400">(Save 20%)</span></button>
+            <span className={`absolute top-1 h-10 w-28 rounded-full bg-purple-600 shadow-md transition-transform duration-300 ease-in-out ${billingCycle === 'yearly' ? 'translate-x-full' : ''}`} />
+        </div>
+      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <PricingCard 
           plan="Starter" 
           price={10} 
           currency={userDetails?.billingCurrency || 'USD'} 
-          features={['AI Thumbnail Studio', 'AI Logo Generator', 'Basic Startup Suite']} 
+          billingCycle={billingCycle}
+          features={['AI Thumbnail Studio', 'AI Logo Generator', 'AI Marketing Campaign Planner', 'Manual Image & Logo Editors', 'Perfect for Creators']} 
           onSelect={() => handleSelectPlan('Starter')} 
           disabled={accountType === 'enterprise'}
-          disabledText="Not available for Company Accounts"
+          disabledText="For Personal Accounts"
         />
         <PricingCard 
           plan="Pro" 
           price={30} 
           currency={userDetails?.billingCurrency || 'USD'} 
-          features={['Unlimited AI Generations', 'AI Thumbnail & Logo Studios', 'Advanced Startup Financials', 'Interactive Lean Canvas', 'Priority Support']} 
+          billingCycle={billingCycle}
+          features={['Complete Startup Suite', 'AI-Powered Lean Canvas', 'Cashbook & Financials', 'Customer & Vendor Tracking', 'Ideal for Startups']} 
           onSelect={() => handleSelectPlan('Pro')} 
           isFeatured={true}
           disabled={accountType === 'enterprise'}
-          disabledText="Not available for Company Accounts"
+          disabledText="For Personal Accounts"
         />
         <PricingCard 
           plan="Enterprise" 
           price={50} 
           currency={userDetails?.billingCurrency || 'USD'} 
-          features={['Central Overview Dashboard', 'Financial Reports (P&L)', 'Detailed Cash Book Management', 'Marketing ROI Tracking', 'Advanced HR & Inventory', 'Dedicated Account Manager']} 
+          billingCycle={billingCycle}
+          features={['All-in-One Business Hub', 'Advanced Financial Reporting', 'HR & Payroll Management', 'Customer & Tax Tracking', 'For Established Businesses']} 
           onSelect={() => handleSelectPlan('Enterprise')} 
           disabled={accountType === 'personal'}
-          disabledText="Requires Company Account Setup"
+          disabledText="Requires Company Account"
         />
       </div>
     </div>

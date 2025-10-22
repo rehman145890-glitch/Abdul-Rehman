@@ -1,27 +1,18 @@
 import React from 'react';
 
 const conversionRates: { [key: string]: number } = {
-    USD: 1,
-    EUR: 0.93,
-    GBP: 0.79,
-    JPY: 157,
-    INR: 83.5,
-    PKR: 278,
+    USD: 1, EUR: 0.93, GBP: 0.79, JPY: 157, INR: 83.5, PKR: 278,
 };
 
 const currencySymbols: { [key: string]: string } = {
-    USD: '$',
-    EUR: '€',
-    GBP: '£',
-    JPY: '¥',
-    INR: '₹',
-    PKR: 'Rs',
-}
+    USD: '$', EUR: '€', GBP: '£', JPY: '¥', INR: '₹', PKR: 'Rs',
+};
 
 interface PricingCardProps {
     plan: string;
-    price: number; // Base price in USD
+    price: number; // Base monthly price in USD
     currency: string;
+    billingCycle: 'monthly' | 'yearly';
     features: string[];
     onSelect: (() => void) | undefined;
     isFeatured?: boolean;
@@ -29,10 +20,14 @@ interface PricingCardProps {
     disabledText?: string;
 }
 
-const PricingCard: React.FC<PricingCardProps> = ({ plan, price, currency, features, onSelect, isFeatured = false, disabled = false, disabledText }) => {
+const PricingCard: React.FC<PricingCardProps> = ({ plan, price, currency, billingCycle, features, onSelect, isFeatured = false, disabled = false, disabledText }) => {
     const rate = conversionRates[currency] || 1;
     const symbol = currencySymbols[currency] || '$';
-    const convertedPrice = Math.round(price * rate);
+    const monthlyPrice = price * rate;
+    const yearlyPrice = monthlyPrice * 12 * 0.8; // 20% discount for yearly
+    
+    const displayPrice = billingCycle === 'yearly' ? Math.round(yearlyPrice / 12) : Math.round(monthlyPrice);
+    const billingText = billingCycle === 'yearly' ? `/month, billed annually` : '/month';
 
     return (
         <div className={`p-8 rounded-xl border ${isFeatured && !disabled ? 'border-purple-500/50 bg-purple-500/5 dark:bg-gray-900' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950/50'} ${disabled ? 'opacity-50' : 'transition-all transform hover:scale-[1.03]'} relative flex flex-col shadow-lg`}>
@@ -40,10 +35,9 @@ const PricingCard: React.FC<PricingCardProps> = ({ plan, price, currency, featur
             <h3 className="text-xl font-bold text-gray-900 dark:text-white">{plan}</h3>
             <div className="mt-4">
                 <p className="text-4xl font-extrabold text-gray-900 dark:text-white">
-                    Free
-                    <span className="text-base font-medium text-gray-500 dark:text-gray-400"> for 1 Month</span>
+                    {symbol}{displayPrice}
+                    <span className="text-base font-medium text-gray-500 dark:text-gray-400">{billingText}</span>
                 </p>
-                <p className="text-sm text-gray-500 mt-1">Then {symbol}{convertedPrice}/month</p>
             </div>
             <div className="h-px bg-gray-200 dark:bg-gray-800 my-6"></div>
             <ul className="space-y-4 text-gray-600 dark:text-gray-400 text-left flex-grow">
@@ -65,7 +59,7 @@ const PricingCard: React.FC<PricingCardProps> = ({ plan, price, currency, featur
                         : 'bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200'
                 }`}
             >
-                {disabled ? disabledText : 'Start Free Trial'}
+                {disabled ? disabledText : 'Start 1-Month Free Trial'}
             </button>
         </div>
     );

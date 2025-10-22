@@ -4,11 +4,19 @@ import LoadingSpinner from './LoadingSpinner';
 interface ImageCanvasProps {
   isLoading: boolean;
   imageUrl: string | null;
-  aspectRatio?: '16:9' | '1:1';
+  aspectRatio?: '16:9' | '1:1' | '9:16' | '4:3' | '3:4';
 }
 
 const ImageCanvas: React.FC<ImageCanvasProps> = ({ isLoading, imageUrl, aspectRatio = '16:9' }) => {
-  const aspectClass = aspectRatio === '1:1' ? 'aspect-square' : 'aspect-video';
+  const aspectClasses = {
+    '16:9': 'aspect-video',
+    '1:1': 'aspect-square',
+    '9:16': 'aspect-[9/16]',
+    '4:3': 'aspect-[4/3]',
+    '3:4': 'aspect-[3/4]',
+  };
+  const aspectClass = aspectClasses[aspectRatio || '16:9'];
+
   const placeholderTitle = aspectRatio === '1:1' ? 'Your Logo Awaits' : 'Your Thumbnail Awaits';
   const Icon = aspectRatio === '1:1' 
     ? <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 dark:text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>

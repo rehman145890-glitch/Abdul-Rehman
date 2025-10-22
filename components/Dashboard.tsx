@@ -1,8 +1,9 @@
+
+
 import React, { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import Toast from './Toast';
 import LaunchModal from './LaunchModal';
 import UpgradeModal from './UpgradeModal';
-import HelpDesk from './HelpDesk';
 import Logo from './Logo';
 
 // Lazy load components for code-splitting and faster initial load
@@ -11,6 +12,7 @@ const CompanyManagement = lazy(() => import('./CompanyManagement'));
 const LogoGenerator = lazy(() => import('./LogoGenerator'));
 const StartupSuite = lazy(() => import('./StartupSuite'));
 const Settings = lazy(() => import('./Settings'));
+const CampaignPlanner = lazy(() => import('./CampaignPlanner'));
 
 
 export type ToastMessage = {
@@ -21,6 +23,7 @@ export type ToastMessage = {
 
 interface DashboardProps {
   onSignOut: () => void;
+  onChangePlan: () => void;
   companyDetails?: {
       businessName?: string;
       logo?: string;
@@ -34,7 +37,7 @@ interface DashboardProps {
   } | null;
 }
 
-type View = 'thumbnail' | 'management' | 'logo' | 'startup' | 'settings';
+type View = 'thumbnail' | 'management' | 'logo' | 'startup' | 'settings' | 'campaigns';
 type Plan = 'Starter' | 'Pro' | 'Enterprise';
 
 const PageLoader: React.FC = () => (
@@ -47,7 +50,7 @@ const PageLoader: React.FC = () => (
 );
 
 
-const Dashboard: React.FC<DashboardProps> = ({ onSignOut, companyDetails, userDetails }) => {
+const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onChangePlan, companyDetails, userDetails }) => {
     const [activeView, setActiveView] = useState<View>();
     const [plan, setPlan] = useState<Plan | null>(null);
     const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -57,7 +60,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSignOut, companyDetails, userDe
     const settingsRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const hasSeenModal = localStorage.getItem('hasSeenKeystoneLaunch');
+        const hasSeenModal = localStorage.getItem('hasSeenNexusOSLaunch');
         if (!hasSeenModal) {
             setShowLaunchModal(true);
         }
@@ -69,7 +72,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSignOut, companyDetails, userDe
             setActiveView('management');
         } else if (storedPlan === 'Pro') {
             setActiveView('startup');
-        } else {
+        } else { // Starter plan or null
             setActiveView('thumbnail');
         }
         
@@ -86,11 +89,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onSignOut, companyDetails, userDe
 
     const features = useMemo(() => {
         const accountType = localStorage.getItem('accountType');
+        const isPersonal = accountType === 'personal';
+        const isEnterprise = accountType === 'enterprise';
+
         return {
-            management: plan === 'Enterprise' && accountType === 'enterprise',
-            startup: (plan === 'Pro' || plan === 'Starter') && accountType === 'personal',
-            thumbnail: (plan === 'Starter' || plan === 'Pro') && accountType === 'personal',
-            logo: (plan === 'Starter' || plan === 'Pro') && accountType === 'personal',
+            management: plan === 'Enterprise' && isEnterprise,
+            startup: plan === 'Pro' && isPersonal,
+            thumbnail: plan === 'Starter' && isPersonal,
+            logo: plan === 'Starter' && isPersonal,
+            campaigns: plan === 'Starter' && isPersonal,
             settings: true,
         };
     }, [plan]);
@@ -101,6 +108,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSignOut, companyDetails, userDe
         logo: 'Logo Generator',
         startup: 'Startup Suite',
         settings: 'Settings',
+        campaigns: 'Campaign Planner',
     };
 
     const handleNavClick = (view: View) => {
@@ -110,13 +118,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onSignOut, companyDetails, userDe
             logo: features.logo,
             startup: features.startup,
             settings: features.settings,
+            campaigns: features.campaigns,
         };
+        
         const requiredPlan: Record<View, Plan> = {
             thumbnail: 'Starter',
             management: 'Enterprise',
             logo: 'Starter', 
-            startup: 'Starter',
-            settings: 'Starter',
+            startup: 'Pro',
+            settings: 'Starter', // Base feature
+            campaigns: 'Starter',
         };
 
         if (featureAccess[view]) {
@@ -128,7 +139,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSignOut, companyDetails, userDe
     };
 
     const handleCloseLaunchModal = () => {
-        localStorage.setItem('hasSeenKeystoneLaunch', 'true');
+        localStorage.setItem('hasSeenNexusOSLaunch', 'true');
         setShowLaunchModal(false);
     };
 
@@ -162,7 +173,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onSignOut, companyDetails, userDe
             case 'management': return features.management ? <CompanyManagement addToast={addToast} companyDetails={companyDetails} /> : null;
             case 'logo': return features.logo ? <LogoGenerator addToast={addToast} /> : null;
             case 'startup': return features.startup ? <StartupSuite addToast={addToast} /> : null;
-            case 'settings': return features.settings ? <Settings onCancelSubscription={onSignOut} /> : null;
+            case 'settings': return features.settings ? <Settings onChangePlan={onChangePlan} onSignOut={onSignOut} /> : null;
+            case 'campaigns': return features.campaigns ? <CampaignPlanner addToast={addToast} /> : null;
             default:
                 if (features.management) return <CompanyManagement addToast={addToast} companyDetails={companyDetails} />;
                 if (features.startup) return <StartupSuite addToast={addToast} />;
@@ -179,14 +191,20 @@ const Dashboard: React.FC<DashboardProps> = ({ onSignOut, companyDetails, userDe
                     currentPlan={plan || 'None'}
                     requiredPlan={upgradeModalInfo.requiredPlan}
                     onClose={() => setUpgradeModalInfo(null)}
-                    onUpgrade={onSignOut}
+                    onUpgrade={onChangePlan}
                 />
             )}
             <aside className="w-64 bg-white/80 dark:bg-black/30 p-4 border-r border-gray-200 dark:border-gray-800 flex flex-col">
                 <div className="mb-8 pt-2">
                      {companyDetails ? (
                         <div className="flex items-center gap-3">
-                            {companyDetails.logo && <img src={companyDetails.logo} alt="Company Logo" className="h-10 w-10 rounded-lg object-contain bg-gray-200 dark:bg-gray-800 p-1 flex-shrink-0" />}
+                            {companyDetails.logo ? 
+                                <img src={companyDetails.logo} alt="Company Logo" className="h-10 w-10 rounded-lg object-contain bg-gray-200 dark:bg-gray-800 p-1 flex-shrink-0" />
+                                :
+                                <div className="h-10 w-10 rounded-lg bg-gray-200 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                </div>
+                             }
                             <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white truncate">{companyDetails.businessName}</h1>
                         </div>
                     ) : userDetails ? (
@@ -210,34 +228,41 @@ const Dashboard: React.FC<DashboardProps> = ({ onSignOut, companyDetails, userDe
                     )}
                 </div>
                 <nav className="flex flex-col space-y-2 flex-grow">
-                     {features.startup && <NavItem 
+                     <NavItem 
                         view="startup" 
                         label="Startup Suite"
                         isLocked={!features.startup}
                         onClick={() => handleNavClick('startup')}
                         icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>}
-                    />}
-                     {features.management && <NavItem 
+                    />
+                     <NavItem 
                         view="management" 
                         label="Enterprise Hub"
                         isLocked={!features.management}
                         onClick={() => handleNavClick('management')}
                         icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>}
-                    />}
-                    {features.thumbnail && <NavItem 
+                    />
+                    <NavItem 
                         view="thumbnail" 
                         label="Thumbnail Studio" 
                         isLocked={!features.thumbnail}
                         onClick={() => handleNavClick('thumbnail')}
                         icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
-                    />}
-                    {features.logo && <NavItem 
+                    />
+                    <NavItem 
                         view="logo" 
                         label="Logo Generator"
                         isLocked={!features.logo}
                         onClick={() => handleNavClick('logo')}
                         icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>}
-                    />}
+                    />
+                    <NavItem 
+                        view="campaigns" 
+                        label="Campaign Planner"
+                        isLocked={!features.campaigns}
+                        onClick={() => handleNavClick('campaigns')}
+                        icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>}
+                    />
                 </nav>
                  <div className="w-full mt-auto space-y-2">
                     <div className="flex items-center justify-center text-xs text-green-600/80 dark:text-green-500/80 pt-4">
@@ -264,6 +289,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onSignOut, companyDetails, userDe
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.096 2.572-1.065z" /><path strokeLinecap="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                     Settings
                                 </button>
+                                <button onClick={onChangePlan} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.5 3H12a2 2 0 00-2 2v2m2-4h3.5A2.5 2.5 0 0118 5.5v13a2.5 2.5 0 01-2.5 2.5h-9A2.5 2.5 0 014 18.5v-13A2.5 2.5 0 016.5 3H8m5.5 6v.01" /></svg>
+                                    Change Plan
+                                </button>
                                 <div className="h-px bg-gray-200 dark:bg-gray-700 my-1"></div>
                                 <button onClick={onSignOut} className="flex items-center w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800/50">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
@@ -284,7 +313,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onSignOut, companyDetails, userDe
                     <Toast key={toast.id} message={toast.message} type={toast.type} />
                 ))}
             </div>
-            <HelpDesk />
         </div>
     );
 };

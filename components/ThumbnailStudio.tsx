@@ -1,8 +1,23 @@
+
+
 import React, { useState, useCallback, useRef, FC } from 'react';
 import ImageCanvas from './ImageCanvas';
 import PromptInput from './PromptInput';
 import { generateThumbnail, ThumbnailOptions } from '../services/geminiService';
 import { ToastMessage } from './Dashboard';
+
+// A simple utility to prevent XSS by escaping HTML characters.
+const sanitizeHTML = (str: string | undefined | null): string => {
+    if (!str) return '';
+    return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+};
+
+type AspectRatio = '16:9' | '1:1' | '9:16';
 
 // --- Manual Editor Types & Constants ---
 interface ManualThumbnailState {
@@ -36,6 +51,20 @@ const ControlGroup: FC<{ label: string; children: React.ReactNode; }> = ({ label
         </div>
     </div>
 );
+
+const AspectRatioButton: FC<{ label: string; value: AspectRatio; isActive: boolean; onClick: (val: AspectRatio) => void }> = ({ label, value, isActive, onClick }) => (
+    <button 
+      onClick={() => onClick(value)}
+      className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+        isActive
+          ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+          : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700'
+      }`}
+    >
+      {label}
+    </button>
+);
+
 
 const ThumbnailCanvas = React.forwardRef<SVGSVGElement, { state: ManualThumbnailState }>(({ state }, ref) => {
   const {
@@ -92,7 +121,7 @@ const ThumbnailCanvas = React.forwardRef<SVGSVGElement, { state: ManualThumbnail
         fontWeight="900"
         style={{ textShadow: '3px 3px 6px rgba(0,0,0,0.7)' }}
       >
-        {titleText}
+        {sanitizeHTML(titleText)}
       </text>
 
       {taglineText && (
@@ -107,7 +136,7 @@ const ThumbnailCanvas = React.forwardRef<SVGSVGElement, { state: ManualThumbnail
           fontWeight="400"
           style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.7)' }}
         >
-          {taglineText}
+          {sanitizeHTML(taglineText)}
         </text>
       )}
     </svg>
@@ -130,7 +159,11 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ addToast }) => {
     logoText: '',
   });
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [watermarkedImageUrl, setWatermarkedImageUrl] = useState<string | null>(null);
+  const [watermarkText, setWatermarkText] = useState('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [referenceImage, setReferenceImage] = useState<File | null>(null);
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
   
   // Manual Editor State
   const [manualState, setManualState] = useState<ManualThumbnailState>({
@@ -149,11 +182,13 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ addToast }) => {
 
   // AI Generator Logic
   const handleGenerate = useCallback(async () => {
-    if (!options.title.trim() && !options.background.trim()) return;
+    if (!options.title.trim() && !options.background.trim() && !referenceImage) return;
     setIsLoading(true);
     setImageUrl(null);
+    setWatermarkedImageUrl(null);
+    setWatermarkText('');
     try {
-      const url = await generateThumbnail(options);
+      const url = await generateThumbnail(options, aspectRatio, referenceImage ?? undefined);
       setImageUrl(url);
       addToast('Thumbnail generated successfully!', 'success');
     } catch (err) {
@@ -165,7 +200,38 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ addToast }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [options, addToast]);
+  }, [options, addToast, referenceImage, aspectRatio]);
+
+  const handleApplyWatermark = () => {
+        if (!imageUrl || !watermarkText.trim()) {
+            addToast('Please generate an image and enter watermark text.', 'error');
+            return;
+        }
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        img.src = imageUrl;
+        img.onload = () => {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx!.drawImage(img, 0, 0);
+            
+            ctx!.font = 'bold 32px Inter';
+            ctx!.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx!.textAlign = 'center';
+            ctx!.textBaseline = 'middle';
+            
+            ctx!.fillText(sanitizeHTML(watermarkText), canvas.width / 2, canvas.height / 2);
+            setWatermarkedImageUrl(canvas.toDataURL('image/jpeg'));
+            addToast('Watermark applied!', 'success');
+        };
+    };
+
+    const openUniquenessCheck = (url: string | null) => {
+        if (!url) return;
+        const searchUrl = `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(url)}`;
+        window.open(searchUrl, '_blank');
+    };
 
   // Manual Editor Logic
   const handleStateChange = (prop: keyof ManualThumbnailState, value: any) => {
@@ -206,7 +272,7 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ addToast }) => {
     
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${manualState.titleText.toLowerCase().replace(/\s/g, '-')}-thumbnail.svg`;
+    a.download = `${sanitizeHTML(manualState.titleText).toLowerCase().replace(/\s/g, '-')}-thumbnail.svg`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -216,17 +282,43 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ addToast }) => {
 
   const renderAiGenerator = () => (
     <div className="w-full flex flex-col items-center">
-      <ImageCanvas isLoading={isLoading} imageUrl={imageUrl} />
-      <div className="w-full max-w-xl">
+      <div className="flex items-center gap-2 mb-4 p-2 bg-gray-100 dark:bg-gray-900/50 rounded-xl">
+        <AspectRatioButton label="YouTube (16:9)" value="16:9" isActive={aspectRatio === '16:9'} onClick={setAspectRatio} />
+        <AspectRatioButton label="Post (1:1)" value="1:1" isActive={aspectRatio === '1:1'} onClick={setAspectRatio} />
+        <AspectRatioButton label="Story (9:16)" value="9:16" isActive={aspectRatio === '9:16'} onClick={setAspectRatio} />
+      </div>
+      <ImageCanvas isLoading={isLoading} imageUrl={watermarkedImageUrl || imageUrl} aspectRatio={aspectRatio} />
+       <div className="w-full max-w-xl">
+         {imageUrl && (
+            <div className="mt-4 p-4 rounded-lg bg-gray-100 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 space-y-3">
+                 <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block">Watermark</label>
+                    <div className="flex gap-2">
+                        <input type="text" value={watermarkText} onChange={e => setWatermarkText(e.target.value)} placeholder="e.g., © Your Name" className={formInputClasses} />
+                        <button onClick={handleApplyWatermark} className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-bold py-2 px-4 rounded-lg text-sm">Apply</button>
+                    </div>
+                 </div>
+                 <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block">Intellectual Property</label>
+                    <button onClick={() => openUniquenessCheck(watermarkedImageUrl || imageUrl)} className="w-full bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/50 dark:hover:bg-blue-900 text-blue-800 dark:text-blue-300 font-bold py-2 px-4 rounded-lg text-sm flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>
+                        Check Uniqueness (Google Lens)
+                    </button>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">This is not legal advice. The uniqueness check is a tool to help you research similar images.</p>
+                 </div>
+            </div>
+          )}
         <PromptInput
           options={options}
           setOptions={setOptions}
           onSubmit={handleGenerate}
           isLoading={isLoading}
+          onFileChange={setReferenceImage}
+          referenceImageName={referenceImage?.name || null}
         />
-         {imageUrl && (
+         {(imageUrl || watermarkedImageUrl) && (
             <a 
-              href={imageUrl} 
+              href={watermarkedImageUrl || imageUrl!} 
               download="ai-generated-thumbnail.jpeg" 
               className="block w-full text-center mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-colors"
             >

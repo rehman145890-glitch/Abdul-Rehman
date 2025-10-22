@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import Logo from './Logo';
 
 interface SettingsProps {
-    onCancelSubscription: () => void;
+    onChangePlan: () => void;
+    onSignOut: () => void;
 }
 
-const Settings: React.FC<SettingsProps> = ({ onCancelSubscription }) => {
+const Settings: React.FC<SettingsProps> = ({ onChangePlan, onSignOut }) => {
     const [plan, setPlan] = useState<string | null>(null);
     const [theme, setTheme] = useState(() => {
         if (typeof window !== 'undefined' && localStorage.getItem('theme')) {
@@ -33,64 +34,39 @@ const Settings: React.FC<SettingsProps> = ({ onCancelSubscription }) => {
     }, [theme]);
 
     const handleCancelClick = () => {
-        if (window.confirm('Are you sure you want to cancel your subscription? This action will sign you out and you will need to choose a new plan to continue using the dashboard.')) {
-            onCancelSubscription();
+        if (window.confirm('Are you sure you want to cancel your subscription? This action will take you to the plan selection screen. Your data will be saved.')) {
+            onChangePlan();
         }
     };
     
-    const handleDownloadLogo = () => {
-        const svgContent = `
-<svg width="130" height="100" viewBox="0 0 130 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="background-color: white; padding: 10px; font-family: 'Inter', sans-serif;">
-  <defs>
-    <linearGradient id="tealGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color: #38A8A8" />
-      <stop offset="100%" style="stop-color: #2A6F6F" />
-    </linearGradient>
-    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color: #EAD49A" />
-      <stop offset="100%" style="stop-color: #C7A25B" />
-    </linearGradient>
-    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
-      <feOffset dx="1" dy="1" result="offsetblur"/>
-      <feComponentTransfer>
-        <feFuncA type="linear" slope="0.5"/>
-      </feComponentTransfer>
-      <feMerge>
-        <feMergeNode/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-  </defs>
-
-  <g transform="translate(0, -10)">
-    <path d="M30 80 C 10 80, 0 60, 15 40 C 25 20, 45 5, 65 5 C 85 5, 105 20, 115 40 C 130 60, 120 80, 100 80" stroke="white" stroke-width="16" fill="none" stroke-linecap="round"/>
-    <path d="M30 80 C 10 80, 0 60, 15 40 C 25 20, 45 5, 65 5" stroke="url(#tealGradient)" stroke-width="10" fill="none" stroke-linecap="round" />
-    <path d="M65 5 C 85 5, 105 20, 115 40 C 130 60, 120 80, 100 80" stroke="url(#goldGradient)" stroke-width="10" fill="none" stroke-linecap="round" />
-    <line x1="30" y1="80" x2="30" y2="70" stroke="white" stroke-width="2.5"/>
-    <line x1="100" y1="80" x2="100" y2="70" stroke="white" stroke-width="2.5"/>
-    <line x1="15" y1="40" x2="22" y2="43" stroke="white" stroke-width="2.5"/>
-    <line x1="115" y1="40" x2="108" y2="43" stroke="white" stroke-width="2.5"/>
-    <g filter="url(#dropShadow)">
-      <path d="M42 80 L 42 50 L 65 65 L 88 50 L 65 30 L 42 50 Z" fill="#1E2A4D" />
-    </g>
-  </g>
-  
-  <g transform="translate(0, 5)">
-    <text x="65" y="80" text-anchor="middle" font-family="inherit" font-size="22" font-weight="900" fill="#1E2A4D">KEYSTONE</text>
-    <text x="65" y="92" text-anchor="middle" font-family="inherit" font-size="8" font-weight="500" letter-spacing="0.3em" fill="#C7A25B">WEBSITE</text>
-  </g>
-</svg>
-`;
-        const blob = new Blob([svgContent.trim()], { type: 'image/svg+xml;charset=utf-8' });
+    const handleExportData = () => {
+        const data: { [key: string]: any } = {};
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+                try {
+                    data[key] = JSON.parse(localStorage.getItem(key)!);
+                } catch (e) {
+                    data[key] = localStorage.getItem(key);
+                }
+            }
+        }
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'keystone-logo.svg';
+        a.download = `nexusos_backup_${new Date().toISOString().split('T')[0]}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    };
+
+    const handleDeleteData = () => {
+        const confirmation = prompt('This will permanently delete all your data from this browser. This action cannot be undone. To confirm, please type "DELETE" below:');
+        if (confirmation === 'DELETE') {
+            onSignOut(); // This already calls localStorage.clear()
+        }
     };
 
 
@@ -100,7 +76,7 @@ const Settings: React.FC<SettingsProps> = ({ onCancelSubscription }) => {
                 <h2 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">
                     Settings
                 </h2>
-                <p className="mt-2 text-lg text-gray-600 dark:text-gray-400">Manage your account and subscription details.</p>
+                <p className="mt-2 text-lg text-gray-600 dark:text-gray-400">Manage your account, data, and subscription details.</p>
             </header>
 
             <div className="w-full max-w-2xl space-y-6">
@@ -146,45 +122,64 @@ const Settings: React.FC<SettingsProps> = ({ onCancelSubscription }) => {
                 </div>
                 
                  <div className="bg-white dark:bg-gray-900/50 p-6 rounded-xl border border-gray-200 dark:border-gray-800">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Brand Assets</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Download the official Keystone logo.</p>
-                    <div className="flex items-center justify-between p-4 bg-gray-100 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-                        <div className="transform scale-75 origin-left">
-                           <Logo />
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Security & Privacy</h3>
+                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">This application is built on enterprise-grade security principles similar to platforms like Microsoft Azure, ensuring your data remains private and protected.</p>
+                     <div className="space-y-4">
+                        <div className="flex items-start gap-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-500 flex-shrink-0 mt-1" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM10 6a1 1 0 011 1v3l-2 2a1 1 0 01-1.414-1.414L9 8.586V7a1 1 0 011-1z" clipRule="evenodd" /></svg>
+                             <div>
+                                <h4 className="font-semibold text-gray-800 dark:text-gray-200">Client-Side Firewall</h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">All your data is processed and stored locally in your browser. It is never sent to our servers, creating a natural firewall that isolates your information on your device.</p>
+                             </div>
                         </div>
-                        <button
-                            onClick={handleDownloadLogo}
-                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm flex items-center gap-2"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            Download SVG
+                        <div className="flex items-start gap-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-500 flex-shrink-0 mt-1" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" /></svg>
+                            <div>
+                                <h4 className="font-semibold text-gray-800 dark:text-gray-200">On-Device Data Encryption</h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">Your data is secured by your password and PIN directly on your device. We have no way to access or recover your account, ensuring end-to-end privacy.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-900/50 p-6 rounded-xl border border-gray-200 dark:border-gray-800">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Security Best Practices</h3>
+                     <ul className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
+                        <li className="flex items-start gap-3"><span className="text-purple-500 mt-1">✓</span><span>Use a strong, unique password and a memorable but non-obvious 4-digit PIN.</span></li>
+                        <li className="flex items-start gap-3"><span className="text-purple-500 mt-1">✓</span><span>Since all data is stored on your device, ensure your computer or mobile phone is password-protected.</span></li>
+                        <li className="flex items-start gap-3"><span className="text-purple-500 mt-1">✓</span><span>Regularly use the "Export All Data" feature to create secure backups of your information.</span></li>
+                    </ul>
+                </div>
+
+                <div className="bg-white dark:bg-gray-900/50 p-6 rounded-xl border border-gray-200 dark:border-gray-800">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Data Management</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Export a backup of your data or delete it permanently.</p>
+                    <div className="flex flex-col sm:flex-row gap-4">
+                        <button onClick={handleExportData} className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-lg transition-colors">
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                            Export All Data
+                        </button>
+                        <button onClick={handleDeleteData} className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-5 rounded-lg transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                            Delete All Data
                         </button>
                     </div>
                 </div>
 
                 <div className="bg-white dark:bg-gray-900/50 p-6 rounded-xl border border-gray-200 dark:border-gray-800">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Subscription Management</h3>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Subscription</h3>
                     <div className="flex items-center justify-between p-4 bg-gray-100 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
                         <div>
                             <p className="text-sm text-gray-600 dark:text-gray-400">Current Plan</p>
                             <p className="text-lg font-semibold text-purple-600 dark:text-purple-400">{plan || 'Not Subscribed'}</p>
                         </div>
+                         <button
+                            onClick={handleCancelClick}
+                            className="bg-red-600/10 hover:bg-red-600/20 text-red-700 dark:text-red-300 font-bold py-2 px-4 rounded-lg transition-colors text-sm"
+                         >
+                            Cancel Plan
+                         </button>
                     </div>
-                </div>
-
-                <div className="bg-red-500/10 dark:bg-red-900/20 p-6 rounded-xl border border-red-500/20 dark:border-red-500/30">
-                     <h3 className="text-xl font-bold text-red-700 dark:text-red-300 mb-2">Cancel Subscription</h3>
-                     <p className="text-red-600/80 dark:text-red-400/80 mb-4 text-sm">
-                        Canceling your subscription will immediately sign you out. All your data will remain securely saved on your device for when you choose to subscribe again.
-                     </p>
-                     <button
-                        onClick={handleCancelClick}
-                        className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-5 rounded-lg transition-colors"
-                     >
-                        Cancel Subscription
-                     </button>
                 </div>
             </div>
         </div>

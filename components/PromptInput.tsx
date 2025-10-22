@@ -6,12 +6,14 @@ interface PromptInputProps {
   setOptions: (options: ThumbnailOptions) => void;
   onSubmit: () => void;
   isLoading: boolean;
+  onFileChange: (file: File | null) => void;
+  referenceImageName: string | null;
 }
 
 const formInputClasses = "w-full rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-200 bg-white border-gray-300 text-gray-800 placeholder-gray-400 dark:bg-gray-900/50 dark:border-gray-700 dark:text-gray-200 dark:placeholder-gray-500";
 
 
-const PromptInput: React.FC<PromptInputProps> = ({ options, setOptions, onSubmit, isLoading }) => {
+const PromptInput: React.FC<PromptInputProps> = ({ options, setOptions, onSubmit, isLoading, onFileChange, referenceImageName }) => {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (isLoading || (!options.title.trim() && !options.background.trim())) return;
@@ -23,7 +25,7 @@ const PromptInput: React.FC<PromptInputProps> = ({ options, setOptions, onSubmit
     setOptions({ ...options, [name]: value });
   };
 
-  const isButtonDisabled = isLoading || (!options.title.trim() && !options.background.trim());
+  const isButtonDisabled = isLoading || (!options.title.trim() && !options.background.trim() && !referenceImageName);
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-xl mt-8 space-y-4">
@@ -39,7 +41,6 @@ const PromptInput: React.FC<PromptInputProps> = ({ options, setOptions, onSubmit
             placeholder="e.g., My Awesome Video"
             className={formInputClasses}
             disabled={isLoading}
-            required
           />
         </div>
         <div>
@@ -70,7 +71,7 @@ const PromptInput: React.FC<PromptInputProps> = ({ options, setOptions, onSubmit
           />
         </div>
       <div>
-        <label htmlFor="background" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Background Description *</label>
+        <label htmlFor="background" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Prompt / Description *</label>
         <textarea
           id="background"
           name="background"
@@ -80,8 +81,16 @@ const PromptInput: React.FC<PromptInputProps> = ({ options, setOptions, onSubmit
           rows={3}
           className={`${formInputClasses} resize-none`}
           disabled={isLoading}
-          required
         />
+         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Describe the background, or if you've added an image, describe how to modify it.</p>
+      </div>
+       <div>
+        <label htmlFor="referenceImage" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Reference Image (Optional)</label>
+        <label htmlFor="referenceImage" className={`flex items-center justify-center w-full p-3 rounded-lg border-2 border-dashed focus-within:ring-2 focus-within:ring-purple-500 transition-all duration-200 cursor-pointer ${referenceImageName ? 'border-purple-500/50 bg-purple-500/10' : 'border-gray-300 dark:border-gray-700 hover:border-purple-500/50'}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v-2a2 2 0 012-2h12a2 2 0 012 2v2m-6-12h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          <span className="text-sm text-gray-600 dark:text-gray-400">{referenceImageName || 'Click to upload an image'}</span>
+        </label>
+        <input id="referenceImage" type="file" accept="image/*" className="hidden" onChange={e => onFileChange(e.target.files ? e.target.files[0] : null)} />
       </div>
       <button
         type="submit"

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'keystone-cache-v2';
+const CACHE_NAME = 'nexusos-cache-v1';
 const urlsToCache = [
   '/',
   '/index.html',
